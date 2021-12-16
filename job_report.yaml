@@ -34,6 +34,12 @@
 
   pre_tasks:
     
+    - name: install lsof
+      package:
+        name: lsof
+        state: present
+      become: true
+
     - name: Create reports/ folder to save reports
       run_once: yes
       delegate_to: localhost
@@ -62,14 +68,41 @@
     ############################
     
     - name: Run a command and save the results (ignore errors)
+      become: true
       shell:
-        cmd: echo 'This is output from command 1.'
+        cmd: find /usr /home /opt /var -xdev -iname "log4j*"
       ignore_errors: yes
       register: cmd1_results
     
     - name: Save command output for later
       set_fact:
         cmd1_saved_results: "{{ cmd1_results }}"
+
+    - name: LSOF
+      shell:
+        cmd: lsof -Fn | egrep '.*log4j.*.jar'
+      ignore_errors: yes
+      register: cmd2_results
+      changed_when: cmd2_results.rc == 1
+      failed_when: cmd2_results.rc == 2
+      become: true
+    
+    - name: Save command output for later
+      set_fact:
+        cmd2_saved_results: "{{ cmd2_results }}"
+
+    - name: JARS/WARS
+      shell:
+        cmd: find /usr /home /opt /var -type f -name '*[wj]ar' -print0 |xargs -n1 -0 zipgrep -l -i log4j2 2>/dev/null
+      ignore_errors: yes
+      register: cmd3_results
+      changed_when: cmd3_results.rc == 1
+      failed_when: cmd3_results.rc == 2
+      become: true
+    
+    - name: Save command output for later
+      set_fact:
+        cmd3_saved_results: "{{ cmd3_results }}"
 
   post_tasks:
 
